@@ -16,13 +16,13 @@ interface GameEngineProps {
   skin: SkinId;
 }
 
-// 扩展陨石类型以存储预计算数据
+// 扩展陨石类型以存储渲染所需数据
 interface CachedMeteorite extends Meteorite {
   vertices: Point[];
   targetId?: number;
 }
 
-// 扩展子弹类型以支持追踪目标缓存
+// 扩展子弹类型以支持追踪与拖尾
 interface OptimizedBullet extends Bullet {
   trail: Point[];
   targetRef?: Meteorite;
@@ -30,7 +30,7 @@ interface OptimizedBullet extends Bullet {
 }
 
 interface EnhancedEffect extends VisualEffect {
-  type: 'particle' | 'shockwave' | 'collection' | 'trailFade' | 'burst' | 'sparks' | 'flare' | 'ring' | 'debris' | 'status';
+  type: 'particle' | 'shockwave' | 'collection' | 'trailFade' | 'burst' | 'sparks' | 'flare' | 'ring' | 'debris' | 'status' | 'impact';
   angle?: number;
   points?: Point[];
   baseColor?: string;
@@ -145,62 +145,21 @@ const GameEngine: React.FC<GameEngineProps> = ({ onGameOver, skin }) => {
         rotationSpeed: (Math.random() - 0.5) * 0.25
       });
     }
-
-    const sparkCount = Math.floor(40 * scale);
-    for (let i = 0; i < sparkCount; i++) {
-      const angle = Math.random() * Math.PI * 2;
-      const speed = 5 + Math.random() * 15;
-      effectsRef.current.push({
-        x, y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
-        life: 0.5 + Math.random() * 0.5, maxLife: 1, size: 2 + Math.random() * 3, 
-        color: isSpring ? '#fbbf24' : (isLgbt ? '#ffffff' : '#e0f2fe'), 
-        type: 'sparks', decayRate: 0.04, flicker: true
-      });
-    }
-    
-    effectsRef.current.push({
-      x, y, vx: 0, vy: 0, life: 1, maxLife: 1, size: 10 * scale, color: isSpring ? '#450a0a' : color, type: 'ring', decayRate: 0.02
-    });
   };
 
   const createImpactEffects = (x: number, y: number, bvx: number, bvy: number, color: string) => {
+    // 命中瞬间的火花与光效
+    effectsRef.current.push({ x, y, vx: 0, vy: 0, life: 0.4, maxLife: 0.4, size: 25, color: '#ffffff', type: 'impact', decayRate: 0.15 });
     effectsRef.current.push({ x, y, vx: 0, vy: 0, life: 0.3, maxLife: 0.3, size: 12, color: '#ffffff', type: 'burst', decayRate: 0.1 });
-    effectsRef.current.push({ x, y, vx: 0, vy: 0, life: 0.5, maxLife: 0.5, size: 5, color, type: 'ring', decayRate: 0.15 });
     const angle = Math.atan2(bvy, bvx) + Math.PI; 
-    for (let i = 0; i < 8; i++) {
-      const spread = (Math.random() - 0.5) * 1.8;
-      const speed = 4 + Math.random() * 6;
+    for (let i = 0; i < 5; i++) {
+      const spread = (Math.random() - 0.5) * 1.5;
+      const speed = 3 + Math.random() * 5;
       effectsRef.current.push({
         x, y, vx: Math.cos(angle + spread) * speed, vy: Math.sin(angle + spread) * speed,
-        life: 0.6, maxLife: 0.6, size: 2 + Math.random() * 2, color: i % 2 === 0 ? '#ffffff' : color, type: 'sparks', decayRate: 0.05
+        life: 0.5, maxLife: 0.5, size: 2, color: i % 2 === 0 ? '#ffffff' : color, type: 'sparks', decayRate: 0.08
       });
     }
-  };
-
-  const createCaptureEffect = (x: number, y: number, color: string, isCore: boolean) => {
-    effectsRef.current.push({ x, y, vx: 0, vy: 0, life: 0.5, maxLife: 0.5, size: isCore ? 12 : 6, color: '#ffffff', type: 'burst', decayRate: 0.15 });
-    effectsRef.current.push({ x, y, vx: 0, vy: 0, life: 0.4, maxLife: 0.4, size: 2, color, type: 'ring', decayRate: 0.08 });
-    if (isCore) effectsRef.current.push({ x, y, vx: 0, vy: 0, life: 0.6, maxLife: 0.6, size: 10, color: '#e9d5ff', type: 'flare', decayRate: 0.1 });
-  };
-
-  const createCollectionConfirmation = (x: number, y: number, isCore: boolean) => {
-    const color = isCore ? '#a855f7' : getThemeColor(1);
-    turretFlashRef.current = isCore ? 1.5 : 1.0; 
-    if (isCore) {
-      triggerScreenShake(8);
-      effectsRef.current.push({ x, y, vx: 0, vy: 0, life: 1, maxLife: 1, size: 50, color: '#a855f7', type: 'shockwave', decayRate: 0.015 });
-    }
-    const flares = isCore ? 24 : 10;
-    for (let i = 0; i < flares; i++) {
-      const angle = Math.random() * Math.PI * 2;
-      const speed = isCore ? (10 + Math.random() * 15) : (6 + Math.random() * 8);
-      effectsRef.current.push({
-        x, y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
-        life: 1, maxLife: 1, size: isCore ? (5 + Math.random() * 5) : (3 + Math.random() * 4), 
-        color: isCore ? '#e9d5ff' : '#ffffff', type: 'flare', decayRate: isCore ? 0.05 : 0.08
-      });
-    }
-    effectsRef.current.push({ x, y, vx: 0, vy: 0, life: 1, maxLife: 1, size: isCore ? 40 : 20, color, type: 'collection', decayRate: isCore ? 0.04 : 0.08 });
   };
 
   const generateMeteoriteVertices = (radius: number, isBoss: boolean) => {
@@ -216,6 +175,21 @@ const GameEngine: React.FC<GameEngineProps> = ({ onGameOver, skin }) => {
     return vertices;
   };
 
+  const generateCraters = (radius: number) => {
+    const craterCount = Math.floor(radius / 5);
+    const craters: {x: number, y: number, r: number}[] = [];
+    for (let i = 0; i < craterCount; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const dist = Math.random() * radius * 0.7;
+      craters.push({
+        x: Math.cos(angle) * dist,
+        y: Math.sin(angle) * dist,
+        r: 1.5 + Math.random() * (radius * 0.25)
+      });
+    }
+    return craters;
+  };
+
   const fireBullet = useCallback(() => {
     if (!gameActiveRef.current || showCardSelection) return;
     const now = gameTimeRef.current;
@@ -226,14 +200,13 @@ const GameEngine: React.FC<GameEngineProps> = ({ onGameOver, skin }) => {
       const canvas = canvasRef.current;
       if (!canvas) return;
       const cX = canvas.width / 2, cY = canvas.height / 2;
-      const currentAngle = turretAngleRef.current;
       const bSpeed = BULLET_SPEED + bonuses.current.bulletSpeedBoost;
       const num = perksRef.current.bulletsPerShot;
       const spread = 0.15;
       
       for (let i = 0; i < num; i++) {
         const offset = (i - (num - 1) / 2) * spread;
-        const finalAngle = currentAngle + offset;
+        const finalAngle = turretAngleRef.current + offset;
         bulletsRef.current.push({
           x: cX, y: cY, 
           vx: Math.cos(finalAngle) * bSpeed, 
@@ -263,7 +236,6 @@ const GameEngine: React.FC<GameEngineProps> = ({ onGameOver, skin }) => {
     gameTimeRef.current += delta;
     survivalTimeRef.current += delta;
     const now = gameTimeRef.current;
-    const survivalSecs = survivalTimeRef.current / 1000;
     const cX = width / 2, cY = height / 2;
 
     const targetAngle = Math.atan2(mousePosRef.current.y - cY, mousePosRef.current.x - cX);
@@ -276,9 +248,10 @@ const GameEngine: React.FC<GameEngineProps> = ({ onGameOver, skin }) => {
     if (screenShakeRef.current > 0) screenShakeRef.current *= 0.9;
 
     const spawnDist = difficultyService.getSpawnDistance(width, height);
-    const spawnInterval = difficultyService.calculateSpawnInterval(survivalSecs, bonuses.current.spawnBoost, perksRef.current.spawnRateMult);
+    const spawnInterval = difficultyService.calculateSpawnInterval(survivalTimeRef.current / 1000, bonuses.current.spawnBoost, perksRef.current.spawnRateMult);
 
-    if (!initialSpawnDoneRef.current && now >= 500 || (initialSpawnDoneRef.current && (now - lastSpawnTimeRef.current >= spawnInterval))) {
+    // 将 initialSpawnDoneRef.current 检测从 500ms 降低到 300ms
+    if (!initialSpawnDoneRef.current && now >= 300 || (initialSpawnDoneRef.current && (now - lastSpawnTimeRef.current >= spawnInterval))) {
       initialSpawnDoneRef.current = true;
       const angle = Math.random() * Math.PI * 2;
       const x = cX + Math.cos(angle) * spawnDist, y = cY + Math.sin(angle) * spawnDist;
@@ -288,12 +261,14 @@ const GameEngine: React.FC<GameEngineProps> = ({ onGameOver, skin }) => {
         x, y, hp: METEORITE_INITIAL_HP, maxHp: METEORITE_INITIAL_HP,
         vx: (dx / dist) * METEORITE_SPEED, vy: (dy / dist) * METEORITE_SPEED,
         radius, rotation: 0, rotationSpeed: (Math.random() - 0.5) * 0.04,
-        spawnTime: now, vertices: generateMeteoriteVertices(radius, false)
+        spawnTime: now, vertices: generateMeteoriteVertices(radius, false),
+        craters: generateCraters(radius)
       });
       lastSpawnTimeRef.current = now;
     }
 
-    if (survivalSecs >= 30 && !bossSpawnedRef.current) {
+    // Boss 逻辑
+    if (survivalTimeRef.current >= 30000 && !bossSpawnedRef.current) {
       setBossWarning(true);
       setTimeout(() => setBossWarning(false), 4000);
       const angle = Math.random() * Math.PI * 2;
@@ -303,28 +278,22 @@ const GameEngine: React.FC<GameEngineProps> = ({ onGameOver, skin }) => {
         x, y, hp: 200, maxHp: 200,
         vx: (dx / dist) * (METEORITE_SPEED * 0.4), vy: (dy / dist) * (METEORITE_SPEED * 0.4),
         radius: 65, rotation: 0, rotationSpeed: 0.008,
-        spawnTime: now, isBoss: true, vertices: generateMeteoriteVertices(65, true)
+        spawnTime: now, isBoss: true, vertices: generateMeteoriteVertices(65, true),
+        craters: generateCraters(65)
       });
       bossSpawnedRef.current = true;
     }
 
     effectsRef.current = effectsRef.current.filter(e => {
       e.x += e.vx; e.y += e.vy; e.vx *= 0.95; e.vy *= 0.95;
-      if (e.rotation !== undefined && e.rotationSpeed !== undefined) e.rotation += e.rotationSpeed;
       e.life -= (e.decayRate || 0.03); 
       return e.life > 0;
     });
 
     meteoritesRef.current.forEach(m => {
       let speedMult = 1;
-      if (m.slowTimer && m.slowTimer > 0) {
-        speedMult = 0.4; m.slowTimer -= delta;
-        if (Math.random() > 0.8) effectsRef.current.push({ x: m.x + (Math.random()-0.5)*m.radius, y: m.y + (Math.random()-0.5)*m.radius, vx: 0, vy: 0, life: 0.6, maxLife: 0.6, size: 2, color: '#7dd3fc', type: 'status' });
-      }
-      if (m.burnTimer && m.burnTimer > 0) {
-        m.hp -= 0.006 * delta; m.burnTimer -= delta;
-        if (Math.random() > 0.7) effectsRef.current.push({ x: m.x + (Math.random()-0.5)*m.radius, y: m.y + (Math.random()-0.5)*m.radius, vx: 0, vy: -1, life: 0.5, maxLife: 0.5, size: 3, color: '#f97316', type: 'status' });
-      }
+      if (m.slowTimer && m.slowTimer > 0) { speedMult = 0.4; m.slowTimer -= delta; }
+      if (m.burnTimer && m.burnTimer > 0) { m.hp -= 0.006 * delta; m.burnTimer -= delta; }
       if (m.flashTimer && m.flashTimer > 0) m.flashTimer -= delta;
       m.x += m.vx * speedMult; m.y += m.vy * speedMult; m.rotation += m.rotationSpeed * speedMult;
       if (Math.sqrt((m.x - cX)**2 + (m.y - cY)**2) < TURRET_RADIUS + 5) {
@@ -332,7 +301,6 @@ const GameEngine: React.FC<GameEngineProps> = ({ onGameOver, skin }) => {
       }
     });
 
-    const mx = mousePosRef.current.x, my = mousePosRef.current.y;
     bulletsRef.current = bulletsRef.current.filter(b => {
       b.trail.push({ x: b.x, y: b.y });
       if (b.trail.length > 20) b.trail.shift();
@@ -341,14 +309,11 @@ const GameEngine: React.FC<GameEngineProps> = ({ onGameOver, skin }) => {
         b.homingSearchCooldown -= delta;
         if (!b.targetRef || b.targetRef.hp <= 0 || b.homingSearchCooldown <= 0) {
           let bestTarget: CachedMeteorite | null = null;
-          let bestScore = Infinity;
+          let bestDist = Infinity;
           for (let m of meteoritesRef.current) {
             if (m.hp <= 0) continue;
-            const distToMouseSq = (m.x - mx)**2 + (m.y - my)**2;
-            const distToBulletSq = (m.x - b.x)**2 + (m.y - b.y)**2;
-            if (distToBulletSq > 1000**2) continue;
-            const score = distToMouseSq + distToBulletSq * 0.1;
-            if (score < bestScore) { bestScore = score; bestTarget = m; }
+            const d = (m.x - b.x)**2 + (m.y - b.y)**2;
+            if (d < bestDist) { bestDist = d; bestTarget = m; }
           }
           b.targetRef = bestTarget || undefined;
           b.homingSearchCooldown = 150;
@@ -373,26 +338,22 @@ const GameEngine: React.FC<GameEngineProps> = ({ onGameOver, skin }) => {
         if ((b.x - m.x)**2 + (b.y - m.y)**2 < (m.radius + b.radius)**2) {
           const dmg = BULLET_DAMAGE + bonuses.current.damageBoost + perksRef.current.damageBoost;
           m.hp -= dmg; statsRef.current.totalDamageDealt += dmg;
-          m.flashTimer = 100; m.flashColor = b.isIce ? '#7dd3fc' : (b.isFire ? '#ef4444' : '#ffffff');
+          m.flashTimer = 120; m.flashColor = b.isIce ? '#7dd3fc' : (b.isFire ? '#ef4444' : '#ffffff');
           if (b.isIce) m.slowTimer = 2000;
           if (b.isFire) m.burnTimer = 3000;
           createImpactEffects(b.x, b.y, b.vx, b.vy, m.flashColor);
           audioManager.playHit(); hit = true; break;
         }
       }
-      const expired = b.distanceTraveled >= b.maxDistance;
-      if (expired || hit) {
-        effectsRef.current.push({ x: 0, y: 0, vx: 0, vy: 0, life: 0.8, maxLife: 0.8, size: b.radius, color: getBulletColor(b, 0.8), type: 'trailFade', points: [...b.trail] });
-      }
-      return !expired && !hit;
+      return b.distanceTraveled < b.maxDistance && !hit;
     });
 
     meteoritesRef.current.forEach(m => {
       if (m.hp <= 0 && !m.isUpgraded) {
         m.isUpgraded = true; statsRef.current.meteoritesDestroyed++;
         createExplosion(m.x, m.y, isSpring ? '#f59e0b' : (isLgbt ? '#ec4899' : (m.isBoss ? '#ef4444' : '#38bdf8')), m.isBoss ? 4.0 : 1.3);
-        const fragCount = m.isBoss ? 24 : 5;
-        for (let i = 0; i < fragCount; i++) fragmentsRef.current.push({ x: m.x, y: m.y, vx: (Math.random()-0.5)*18, vy: (Math.random()-0.5)*18, radius: FRAGMENT_RADIUS, color: isSpring ? '#fbbf24' : '#fbbf24', opacity: 1 });
+        const fragCount = m.isBoss ? 20 : 4;
+        for (let i = 0; i < fragCount; i++) fragmentsRef.current.push({ x: m.x, y: m.y, vx: (Math.random()-0.5)*15, vy: (Math.random()-0.5)*15, radius: FRAGMENT_RADIUS, color: '#fbbf24', opacity: 1 });
         if (m.isBoss) { firstBossDefeatedRef.current = true; fragmentsRef.current.push({ x: m.x, y: m.y, vx: 0, vy: 0, radius: FRAGMENT_RADIUS * 2.5, color: '#a855f7', opacity: 1, isCore: true }); }
       }
     });
@@ -400,23 +361,27 @@ const GameEngine: React.FC<GameEngineProps> = ({ onGameOver, skin }) => {
     meteoritesRef.current = meteoritesRef.current.filter(m => m.hp > 0);
     fragmentsRef.current = fragmentsRef.current.filter(f => {
       if (!f.isMovingToTurret) {
-        f.x += f.vx; f.y += f.vy; f.vx *= 0.91; f.vy *= 0.91;
-        // 使用动态收集范围
-        const collectionRange = 30 + (bonuses.current.magnetRangeBoost || 0);
-        if ((mx - f.x)**2 + (my - f.y)**2 < collectionRange**2) { f.isMovingToTurret = true; createCaptureEffect(f.x, f.y, f.color, !!f.isCore); }
+        f.x += f.vx; f.y += f.vy; f.vx *= 0.92; f.vy *= 0.92;
+        const distToMouseSq = (mousePosRef.current.x - f.x)**2 + (mousePosRef.current.y - f.y)**2;
+        if (distToMouseSq < (30 + (bonuses.current.magnetRangeBoost || 0))**2) f.isMovingToTurret = true;
       } else {
         const dx = cX - f.x, dy = cY - f.y, d = Math.sqrt(dx*dx + dy*dy);
-        f.x += (dx/d) * (f.isCore ? 18 : 14); f.y += (dy/d) * (f.isCore ? 18 : 14);
+        f.x += (dx/d) * 12; f.y += (dy/d) * 12;
         if (d < TURRET_RADIUS + 5) {
           if (f.isCore) statsRef.current.coresCollected++;
-          else { statsRef.current.fragmentsCollected++; currentUpgradeProgressRef.current++; if (currentUpgradeProgressRef.current >= upgradeThresholdRef.current) { currentUpgradeProgressRef.current = 0; upgradeThresholdRef.current = Math.floor(upgradeThresholdRef.current * 1.4) + 3; setShowCardSelection(true); } }
-          createCollectionConfirmation(cX, cY, !!f.isCore); audioManager.playCollect(); return false;
+          else { 
+            statsRef.current.fragmentsCollected++; currentUpgradeProgressRef.current++; 
+            if (currentUpgradeProgressRef.current >= upgradeThresholdRef.current) { 
+              currentUpgradeProgressRef.current = 0; upgradeThresholdRef.current = Math.floor(upgradeThresholdRef.current * 1.5) + 3; setShowCardSelection(true); 
+            } 
+          }
+          audioManager.playCollect(); return false;
         }
       }
       return true;
     });
 
-    setHud({ totalFrags: statsRef.current.fragmentsCollected, totalCores: statsRef.current.coresCollected, progress: Math.min(1, currentUpgradeProgressRef.current / upgradeThresholdRef.current), survivalSecs: Math.floor(survivalSecs), threshold: upgradeThresholdRef.current });
+    setHud({ totalFrags: statsRef.current.fragmentsCollected, totalCores: statsRef.current.coresCollected, progress: Math.min(1, currentUpgradeProgressRef.current / upgradeThresholdRef.current), survivalSecs: Math.floor(survivalTimeRef.current / 1000), threshold: upgradeThresholdRef.current });
   }, [onGameOver, isLgbt, isSpring, showCardSelection]);
 
   const draw = useCallback((ctx: CanvasRenderingContext2D, width: number, height: number) => {
@@ -432,57 +397,52 @@ const GameEngine: React.FC<GameEngineProps> = ({ onGameOver, skin }) => {
     ctx.beginPath(); ctx.arc(cX, cY, CIRCLE_RADIUS, 0, Math.PI*2);
     ctx.strokeStyle = isSpring ? 'rgba(251, 191, 36, 0.1)' : 'rgba(56, 189, 248, 0.1)'; ctx.lineWidth = 2; ctx.stroke();
 
-    ctx.save(); ctx.translate(cX, cY); ctx.rotate(turretAngleRef.current);
-    ctx.beginPath(); ctx.moveTo(TURRET_RADIUS + 45, 0); ctx.lineTo(TURRET_RADIUS + 38, -3); ctx.lineTo(TURRET_RADIUS + 38, 3); ctx.closePath();
-    ctx.fillStyle = getThemeColor(0.4); ctx.fill();
-    ctx.setLineDash([2, 8]); ctx.beginPath(); ctx.moveTo(TURRET_RADIUS + 55, 0); ctx.lineTo(CIRCLE_RADIUS, 0); ctx.strokeStyle = getThemeColor(0.15); ctx.stroke();
-    ctx.restore();
-
     bulletsRef.current.forEach(b => {
       if (b.trail.length > 1) {
-        ctx.save(); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+        ctx.save(); ctx.lineCap = 'round';
         for (let i = 1; i < b.trail.length; i++) {
           const ratio = i / b.trail.length;
-          ctx.strokeStyle = getBulletColor(b, ratio * 0.45, i * 8); ctx.lineWidth = b.radius * ratio * 1.8;
+          ctx.strokeStyle = getBulletColor(b, ratio * 0.45); ctx.lineWidth = b.radius * ratio;
           ctx.beginPath(); ctx.moveTo(b.trail[i-1].x, b.trail[i-1].y); ctx.lineTo(b.trail[i].x, b.trail[i].y); ctx.stroke();
         }
         ctx.restore();
       }
-      ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(Math.atan2(b.vy, b.vx));
-      const headColor = getBulletColor(b, 1); ctx.shadowBlur = 18; ctx.shadowColor = headColor;
-      const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, b.radius); grad.addColorStop(0, '#fff'); grad.addColorStop(0.7, headColor); grad.addColorStop(1, 'transparent');
-      ctx.fillStyle = grad; ctx.beginPath(); ctx.ellipse(0, 0, b.radius * 1.4, b.radius * 0.9, 0, 0, Math.PI * 2); ctx.fill();
-      ctx.restore();
+      ctx.save(); ctx.translate(b.x, b.y); ctx.fillStyle = getBulletColor(b, 1);
+      ctx.beginPath(); ctx.arc(0, 0, b.radius, 0, Math.PI * 2); ctx.fill(); ctx.restore();
     });
 
     meteoritesRef.current.forEach(m => {
       ctx.save(); ctx.translate(m.x, m.y); ctx.rotate(m.rotation);
-      renderService.drawMinimalistMeteorite(ctx, m.radius, !!m.isBoss, isSpring, m.spawnTime, firstBossDefeatedRef.current, m.vertices);
-      if (m.flashTimer && m.flashTimer > 0) { ctx.fillStyle = m.flashColor || '#ffffff'; ctx.globalAlpha = (m.flashTimer / 100) * 0.5; ctx.fill(); }
-      if (m.slowTimer && m.slowTimer > 0) { ctx.fillStyle = 'rgba(125, 211, 252, 0.3)'; ctx.fill(); }
-      if (m.burnTimer && m.burnTimer > 0) { ctx.fillStyle = 'rgba(239, 68, 68, 0.25)'; ctx.fill(); }
-      ctx.globalAlpha = 1.0; ctx.fillStyle = 'rgba(0,0,0,0.7)'; ctx.fillRect(-m.radius, -m.radius-20, m.radius*2, 4);
-      ctx.fillStyle = m.hp < (m.maxHp * 0.3) ? '#f43f5e' : (isSpring ? '#f59e0b' : (m.isBoss ? '#a855f7' : '#0ea5e9'));
-      ctx.fillRect(-m.radius, -m.radius-20, (m.hp/m.maxHp)*m.radius*2, 4);
+      renderService.drawMinimalistMeteorite(ctx, m.radius, !!m.isBoss, isSpring, m.spawnTime, firstBossDefeatedRef.current, m.vertices, m.craters);
+      
+      // 闪光效果渲染
+      if (m.flashTimer && m.flashTimer > 0) {
+        ctx.fillStyle = m.flashColor || '#ffffff';
+        const alpha = (m.flashTimer / 120);
+        ctx.globalAlpha = alpha * 0.8; // 稍微增加透明度让闪光更亮
+        ctx.fill();
+        ctx.shadowBlur = 20 * alpha; // 增加阴影范围
+        ctx.shadowColor = m.flashColor || '#ffffff';
+        ctx.strokeStyle = m.flashColor || '#ffffff';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
       ctx.restore();
     });
 
     fragmentsRef.current.forEach(f => {
       if (f.isCore) {
         ctx.save(); const glow = 0.8 + Math.sin(Date.now() * 0.01) * 0.2;
-        const grad = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, f.radius * 3.5); grad.addColorStop(0, '#fff'); grad.addColorStop(0.3, '#c084fc'); grad.addColorStop(1, 'transparent');
+        const grad = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, f.radius * 3); grad.addColorStop(0, '#fff'); grad.addColorStop(0.3, '#c084fc'); grad.addColorStop(1, 'transparent');
         ctx.fillStyle = grad; ctx.globalAlpha = glow; ctx.beginPath(); ctx.arc(f.x, f.y, f.radius * 4, 0, Math.PI*2); ctx.fill(); ctx.restore();
       } else { ctx.fillStyle = f.color; ctx.beginPath(); ctx.arc(f.x, f.y, f.radius, 0, Math.PI*2); ctx.fill(); }
     });
 
     effectsRef.current.forEach(e => {
-      ctx.save(); let life = e.life; if (e.flicker && Math.random() > 0.5) life *= 0.4;
-      ctx.globalAlpha = life;
-      if (e.type === 'particle' || e.type === 'status') { ctx.fillStyle = e.color; ctx.beginPath(); ctx.arc(e.x, e.y, e.size * life, 0, Math.PI * 2); ctx.fill(); }
-      else if (e.type === 'debris') { ctx.save(); ctx.translate(e.x, e.y); ctx.rotate(e.rotation || 0); ctx.fillStyle = e.color; const s = e.size * life; ctx.fillRect(-s/2, -s/2, s, s); ctx.restore(); }
-      else if (e.type === 'burst') { const grad = ctx.createRadialGradient(e.x, e.y, 0, e.x, e.y, e.size * (1 - life * 0.4)); grad.addColorStop(0, e.color); grad.addColorStop(1, 'transparent'); ctx.fillStyle = grad; ctx.beginPath(); ctx.arc(e.x, e.y, e.size, 0, Math.PI * 2); ctx.fill(); }
-      else if (e.type === 'shockwave' || e.type === 'ring') { ctx.strokeStyle = e.color; ctx.lineWidth = 4 * life; ctx.beginPath(); ctx.arc(e.x, e.y, e.size + (1-life)*80, 0, Math.PI*2); ctx.stroke(); }
-      else if (e.type === 'trailFade' && e.points) { ctx.lineCap = 'round'; e.points.forEach((p, i) => { const alpha = (i/e.points!.length)*life*0.5; ctx.strokeStyle = e.color; ctx.globalAlpha = alpha; ctx.lineWidth = e.size*(i/e.points!.length)*1.5; ctx.beginPath(); const prev = e.points![i-1] || p; ctx.moveTo(prev.x, prev.y); ctx.lineTo(p.x, p.y); ctx.stroke(); }); }
+      ctx.save(); ctx.globalAlpha = e.life; ctx.fillStyle = e.color;
+      if (e.type === 'impact' || e.type === 'burst') { ctx.beginPath(); ctx.arc(e.x, e.y, e.size * (1 - e.life * 0.5), 0, Math.PI * 2); ctx.fill(); }
+      else if (e.type === 'shockwave') { ctx.strokeStyle = e.color; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(e.x, e.y, e.size + (1 - e.life) * 50, 0, Math.PI * 2); ctx.stroke(); }
+      else { ctx.beginPath(); ctx.arc(e.x, e.y, e.size, 0, Math.PI * 2); ctx.fill(); }
       ctx.restore();
     });
 
@@ -490,11 +450,11 @@ const GameEngine: React.FC<GameEngineProps> = ({ onGameOver, skin }) => {
     const recoil = Math.max(0, 1 - ((gameTimeRef.current - lastFireTimeRef.current) / 180)) * 12;
     renderService.drawComplexTurret(ctx, turretAngleRef.current, recoil, turretFlashRef.current, isSpring, isLgbt);
     ctx.restore(); ctx.restore(); 
-  }, [isSpring, isLgbt, getBulletColor, getThemeColor]);
+  }, [isSpring, isLgbt, getBulletColor]);
 
   useEffect(() => {
     const c = canvasRef.current; if (!c) return;
-    const ctx = c.getContext('2d', { alpha: true });
+    const ctx = c.getContext('2d');
     let frame: number;
     const resize = () => { c.width = window.innerWidth; c.height = window.innerHeight; };
     const move = (e: MouseEvent) => { mousePosRef.current = { x: e.clientX, y: e.clientY }; };
@@ -528,9 +488,8 @@ const GameEngine: React.FC<GameEngineProps> = ({ onGameOver, skin }) => {
         else if(id === 'moreMeteorites') perksRef.current.spawnRateMult += 0.5;
         setShowCardSelection(false);
       }} ownedPerks={perksRef.current.ownedOneTimers} isSpring={isSpring} isLgbt={isLgbt} />}
-      <div className="absolute top-0 left-0 w-full h-1 bg-slate-900/50 backdrop-blur-sm z-50">
-        <div className={`h-full transition-all duration-500 ease-out ${isSpring ? 'bg-amber-500 shadow-[0_0_10px_#f59e0b]' : isLgbt ? 'bg-pink-500 shadow-[0_0_10px_#ec4899]' : 'bg-sky-500 shadow-[0_0_10px_#0ea5e9]'}`} style={{ width: `${hud.progress * 100}%` }} />
-        <div className="absolute top-1 left-1/2 -translate-x-1/2 text-[8px] font-black uppercase tracking-widest text-slate-500 opacity-80">强化核心载入中 ({currentUpgradeProgressRef.current}/{hud.threshold})</div>
+      <div className="absolute top-0 left-0 w-full h-1 bg-slate-900/50 z-50">
+        <div className={`h-full transition-all duration-500 ${isSpring ? 'bg-amber-500 shadow-[0_0_10px_#f59e0b]' : isLgbt ? 'bg-pink-500 shadow-[0_0_10px_#ec4899]' : 'bg-sky-500 shadow-[0_0_10px_#0ea5e9]'}`} style={{ width: `${hud.progress * 100}%` }} />
       </div>
       <div className="absolute top-6 left-6 flex gap-4 z-50">
         <div className="p-4 bg-slate-950/80 rounded-2xl border border-white/5 backdrop-blur-md font-mono shadow-2xl">
@@ -543,7 +502,7 @@ const GameEngine: React.FC<GameEngineProps> = ({ onGameOver, skin }) => {
         </div>
       </div>
       <div className="absolute top-6 right-6 p-4 bg-slate-950/80 rounded-2xl border border-white/5 backdrop-blur-md font-mono z-50 shadow-2xl text-right">
-        <div className="text-[9px] text-slate-500 uppercase font-black tracking-widest mb-1">系统在线</div>
+        <div className="text-[9px] text-slate-500 uppercase font-black tracking-widest mb-1">生存时间</div>
         <div className="text-3xl text-white font-black drop-shadow-[0_0_8px_rgba(255,255,255,0.2)]">{formatTime(hud.survivalSecs)}</div>
       </div>
       <canvas ref={canvasRef} />

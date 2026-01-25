@@ -74,19 +74,29 @@ const App: React.FC = () => {
 
       {gameState === 'START' && (
         <div className="fixed inset-0 z-50 flex flex-col items-center justify-center p-4">
-          <button 
-            onClick={toggleSkin}
-            className={`absolute top-10 left-10 flex items-center gap-3 px-5 py-3 rounded-full border transition-all hover:scale-105 z-50 ${
-              isSpring ? 'bg-red-950/40 border-amber-600 text-amber-400' : 
-              isLgbt ? 'bg-purple-900/40 border-pink-400/50 text-pink-300' : 
-              'bg-white/5 border-white/10 text-slate-400'
-            }`}
-          >
-            <span className="text-xl">{isSpring ? '🏮' : isLgbt ? '🏳️‍🌈' : '🛰️'}</span>
-            <span className="text-[10px] font-bold uppercase tracking-widest">
-              {isSpring ? '新春限定' : isLgbt ? '多元宇宙' : '默认模式'}
-            </span>
-          </button>
+          <div className="absolute top-10 left-10 flex flex-col gap-2 z-50">
+             <span className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] ml-2">Armor Skin</span>
+             <button 
+                onClick={toggleSkin}
+                className={`flex items-center gap-4 px-6 py-3 rounded-2xl border transition-all hover:scale-105 active:scale-95 shadow-2xl ${
+                  isSpring ? 'bg-red-950/60 border-amber-500 text-amber-400 shadow-red-900/20' : 
+                  isLgbt ? 'bg-purple-900/60 border-pink-400/50 text-pink-300 shadow-purple-900/20' : 
+                  'bg-white/5 border-white/10 text-slate-400'
+                }`}
+              >
+                <div className="text-2xl transition-transform duration-500 transform group-hover:rotate-12">
+                  {isSpring ? '🏮' : isLgbt ? '🏳️‍🌈' : '🛰️'}
+                </div>
+                <div className="flex flex-col items-start">
+                  <span className="text-[11px] font-black uppercase tracking-widest leading-none">
+                    {isSpring ? '新春限定' : isLgbt ? '多元宇宙' : '标准型号'}
+                  </span>
+                  <span className="text-[8px] font-bold opacity-50 uppercase tracking-tighter mt-1">
+                    {isSpring ? 'Spring Festival' : isLgbt ? 'Rainbow Pride' : 'Default Armor'}
+                  </span>
+                </div>
+              </button>
+          </div>
 
           <div className="text-center max-w-lg relative z-10">
             <h1 className={`text-7xl font-black mb-2 tracking-tighter uppercase transition-all duration-1000 ${getThemeColor()} ${
@@ -157,7 +167,7 @@ const App: React.FC = () => {
         </div>
       )}
 
-      {gameState === 'OPENING' && <OpeningAnimation onComplete={startGame} />}
+      {gameState === 'OPENING' && <OpeningAnimation onComplete={startGame} skin={skin} />}
       {gameState === 'PLAYING' && <GameEngine onGameOver={handleGameOver} skin={skin} />}
       {gameState === 'GAMEOVER' && lastStats && <SummaryOverlay stats={lastStats} onRestart={handleStartSequence} onOpenTalents={() => setGameState('TALENTS')} skin={skin} />}
       {gameState === 'TALENTS' && <TalentTree onBack={() => setGameState('START')} skin={skin} />}

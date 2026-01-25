@@ -40,23 +40,24 @@ const BackgroundAtmosphere: React.FC<BackgroundAtmosphereProps> = ({ skin }) => 
       opacity: Math.random() * layer.opacity,
       speed: layer.speed,
       color: isLgbt 
-        ? `hsl(${Math.random() * 360}, 70%, 70%)` 
+        ? `hsl(${Math.random() * 360}, 80%, 75%)` 
         : (isSpring ? '#fbbf24' : '#fff')
     })));
 
     // Comets
-    const comets = Array.from({ length: 2 }, () => ({
+    const comets = Array.from({ length: isLgbt ? 4 : 2 }, () => ({
         x: Math.random() * width,
         y: Math.random() * height,
         vx: -2 - Math.random() * 5,
         vy: 1 + Math.random() * 2,
         length: 50 + Math.random() * 100,
         active: false,
-        timer: Math.random() * 1000
+        timer: Math.random() * 1000,
+        color: isLgbt ? `hsl(${Math.random() * 360}, 80%, 70%)` : '#fff'
     }));
 
-    // Enhanced Nebulae with swirl parameters
-    const nebulae = Array.from({ length: 6 }, (_, i) => ({
+    // Enhanced Nebulae
+    const nebulae = Array.from({ length: isLgbt ? 8 : 6 }, (_, i) => ({
       x: Math.random() * width,
       y: Math.random() * height,
       radius: 400 + Math.random() * 500,
@@ -65,11 +66,11 @@ const BackgroundAtmosphere: React.FC<BackgroundAtmosphereProps> = ({ skin }) => 
       rotation: Math.random() * Math.PI * 2,
       rotationSpeed: (Math.random() - 0.5) * 0.002,
       color: isLgbt 
-        ? ['rgba(236, 72, 153, 0.05)', 'rgba(168, 85, 247, 0.05)', 'rgba(59, 130, 246, 0.05)', 'rgba(34, 197, 94, 0.05)'][i % 4]
-        : (isSpring ? 'rgba(153, 27, 27, 0.07)' : 'rgba(30, 58, 138, 0.07)')
+        ? [`rgba(239, 68, 68, 0.08)`, `rgba(245, 158, 11, 0.08)`, `rgba(251, 191, 36, 0.08)`, `rgba(34, 197, 94, 0.08)`, `rgba(59, 130, 246, 0.08)`, `rgba(168, 85, 247, 0.08)`][i % 6]
+        : (isSpring ? 'rgba(153, 27, 27, 0.08)' : 'rgba(30, 58, 138, 0.08)')
     }));
 
-    // Enhanced Planets with surface details
+    // Enhanced Planets
     const planets = Array.from({ length: 4 }, (_, i) => ({
       x: Math.random() * width,
       y: Math.random() * height,
@@ -79,8 +80,8 @@ const BackgroundAtmosphere: React.FC<BackgroundAtmosphereProps> = ({ skin }) => 
       rotation: Math.random() * Math.PI * 2,
       rotationSpeed: (Math.random() - 0.5) * 0.0008,
       color: isLgbt 
-        ? `hsla(${(i * 90) % 360}, 60%, 50%, 0.12)`
-        : (isSpring ? 'rgba(251, 191, 36, 0.1)' : 'rgba(71, 85, 105, 0.1)'),
+        ? `hsla(${(i * 90) % 360}, 70%, 55%, 0.15)`
+        : (isSpring ? 'rgba(251, 191, 36, 0.12)' : 'rgba(71, 85, 105, 0.1)'),
       details: Array.from({ length: 3 }, () => ({
         x: (Math.random() - 0.5) * 20,
         y: (Math.random() - 0.5) * 20,
@@ -93,7 +94,6 @@ const BackgroundAtmosphere: React.FC<BackgroundAtmosphereProps> = ({ skin }) => 
       ctx.fillStyle = isSpring ? '#1a0b0b' : (isLgbt ? '#0a0510' : '#000');
       ctx.fillRect(0, 0, width, height);
 
-      // Render swirling nebulae
       nebulae.forEach(n => {
         n.x += n.vx; n.y += n.vy;
         n.rotation += n.rotationSpeed;
@@ -104,7 +104,6 @@ const BackgroundAtmosphere: React.FC<BackgroundAtmosphereProps> = ({ skin }) => 
         if (n.y > height + n.radius) n.y = -n.radius;
 
         ctx.save();
-        // Create a slightly off-center gradient that rotates
         const offsetX = Math.cos(n.rotation) * (n.radius * 0.2);
         const offsetY = Math.sin(n.rotation) * (n.radius * 0.2);
         const grad = ctx.createRadialGradient(n.x + offsetX, n.y + offsetY, 0, n.x, n.y, n.radius);
@@ -115,7 +114,6 @@ const BackgroundAtmosphere: React.FC<BackgroundAtmosphereProps> = ({ skin }) => 
         ctx.restore();
       });
 
-      // Stars
       starLayers.forEach(layer => {
         layer.forEach(s => {
           s.y += s.speed;
@@ -127,7 +125,6 @@ const BackgroundAtmosphere: React.FC<BackgroundAtmosphereProps> = ({ skin }) => 
       });
       ctx.globalAlpha = 1;
 
-      // Comets
       comets.forEach(c => {
           if (!c.active) {
               c.timer--;
@@ -140,7 +137,7 @@ const BackgroundAtmosphere: React.FC<BackgroundAtmosphereProps> = ({ skin }) => 
           } else {
               c.x += c.vx; c.y += c.vy;
               const grad = ctx.createLinearGradient(c.x, c.y, c.x - c.vx * 10, c.y - c.vy * 10);
-              grad.addColorStop(0, '#fff');
+              grad.addColorStop(0, c.color);
               grad.addColorStop(1, 'transparent');
               ctx.strokeStyle = grad;
               ctx.lineWidth = 2;
@@ -149,7 +146,6 @@ const BackgroundAtmosphere: React.FC<BackgroundAtmosphereProps> = ({ skin }) => 
           }
       });
 
-      // Rotating Planets
       planets.forEach(p => {
         p.x += p.vx; p.y += p.vy; p.rotation += p.rotationSpeed;
         if (p.x < -p.radius * 2) p.x = width + p.radius * 2;
@@ -160,31 +156,27 @@ const BackgroundAtmosphere: React.FC<BackgroundAtmosphereProps> = ({ skin }) => 
         ctx.save();
         ctx.translate(p.x, p.y);
         
-        // Outer glow
         const glowGrad = ctx.createRadialGradient(0, 0, p.radius, 0, 0, p.radius * 1.5);
         glowGrad.addColorStop(0, p.color);
         glowGrad.addColorStop(1, 'transparent');
         ctx.fillStyle = glowGrad;
-        ctx.globalAlpha = 0.3;
+        ctx.globalAlpha = 0.35;
         ctx.beginPath(); ctx.arc(0, 0, p.radius * 1.5, 0, Math.PI * 2); ctx.fill();
         ctx.globalAlpha = 1.0;
 
-        // Base planet body
         ctx.rotate(p.rotation);
         const pGrad = ctx.createLinearGradient(-p.radius, -p.radius, p.radius, p.radius);
-        pGrad.addColorStop(0, p.color); pGrad.addColorStop(1, 'rgba(0,0,0,0.8)');
+        pGrad.addColorStop(0, p.color); pGrad.addColorStop(1, 'rgba(0,0,0,0.85)');
         ctx.fillStyle = pGrad;
         ctx.beginPath(); ctx.arc(0, 0, p.radius, 0, Math.PI * 2); ctx.fill();
 
-        // Surface details (craters/clouds)
         p.details.forEach(d => {
-          ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
+          ctx.fillStyle = isLgbt ? `hsla(${Math.random() * 360}, 50%, 90%, 0.1)` : 'rgba(255, 255, 255, 0.05)';
           ctx.beginPath();
           ctx.arc(d.x, d.y, d.r, 0, Math.PI * 2);
           ctx.fill();
         });
 
-        // Atmosphere ring (if applicable)
         ctx.strokeStyle = p.color;
         ctx.lineWidth = 0.5;
         ctx.globalAlpha = 0.5;
