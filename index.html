@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -9,24 +8,783 @@
     <script type="importmap">
 {
   "imports": {
-    "react": "https://esm.sh/react@18.2.0",
-    "react-dom": "https://esm.sh/react-dom@18.2.0",
-    "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
-    "react/": "https://esm.sh/react@18.2.0/",
-    "react-dom/": "https://esm.sh/react-dom@18.2.0/",
-    "@google/genai": "https://esm.sh/@google/genai"
+    "@google/genai": "https://esm.sh/@google/genai",
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "react": "https://esm.sh/react@^19.2.3",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/"
   }
 }
 </script>
     <style>
         body { margin: 0; padding: 0; background-color: #000; overflow: hidden; color: white; font-family: system-ui, -apple-system, sans-serif; }
-        canvas { display: block; }
+        canvas { display: block; position: fixed; inset: 0; z-index: 0; }
         .font-mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
         ::-webkit-scrollbar { display: none; }
+        .screen { position: fixed; inset: 0; z-index: 10; display: flex; flex-direction: column; align-items: center; justify-content: center; background: transparent; }
+        .hidden { display: none !important; }
+        .fade-in { animation: fadeIn 0.5s ease-out forwards; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .cursor-crosshair { cursor: crosshair; }
+        .hud-top { position: fixed; top: 0; left: 0; width: 100%; z-index: 50; }
+        .progress-bar { height: 4px; transition: width 0.5s ease-out; }
     </style>
 </head>
-<body>
-    <div id="root"></div>
-    <script type="module" src="index.tsx"></script>
+<body class="bg-black">
+    <canvas id="bg-canvas"></canvas>
+    <canvas id="game-canvas"></canvas>
+
+    <!-- UI Overlay Layer -->
+    <div id="ui-root" class="relative z-50 w-full h-full">
+        
+        <!-- Start Screen -->
+        <div id="start-screen" class="screen flex flex-col items-center justify-center p-4">
+            <button id="toggle-skin-btn" class="absolute top-10 left-10 flex items-center gap-3 px-5 py-3 rounded-full border border-white/10 bg-white/5 text-slate-400 transition-all hover:scale-105 z-50">
+                <span id="skin-icon" class="text-xl">🛰️</span>
+                <span id="skin-label" class="text-[10px] font-bold uppercase tracking-widest">默认模式</span>
+            </button>
+
+            <div class="text-center max-w-lg relative z-10">
+                <h1 id="main-title" class="text-7xl font-black mb-2 tracking-tighter uppercase text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.3)]">
+                    星际卫士
+                </h1>
+                <p id="main-subtitle" class="mb-8 text-lg font-light text-gray-400">
+                    核心防区正受到威胁。誓死保卫核心。
+                </p>
+                
+                <div id="instruction-box" class="rounded-3xl p-8 mb-10 text-left border border-gray-800 bg-gray-900/40 backdrop-blur-sm">
+                    <h3 id="instruction-title" class="text-xs font-black uppercase tracking-[0.3em] mb-4 text-center text-slate-500">
+                        — 作战指南 —
+                    </h3>
+                    <ul class="text-sm space-y-4 font-medium leading-relaxed text-gray-300">
+                        <li class="flex items-center gap-3">
+                            <div class="w-1 h-1 rounded-full bg-sky-500"></div>
+                            <span>点击鼠标左键控制炮塔向光标方向进行射击。</span>
+                        </li>
+                        <li class="flex items-center gap-3">
+                            <div class="w-1 h-1 rounded-full bg-sky-500"></div>
+                            <span>移动鼠标至陨石碎片上进行能量回收与收集。</span>
+                        </li>
+                        <li class="flex items-center gap-3">
+                            <div class="w-1 h-1 rounded-full bg-sky-500"></div>
+                            <span>若陨石撞击中心炮塔，防御协议将立即终止。</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <div class="flex flex-col gap-4">
+                    <div class="flex gap-4">
+                        <button id="start-game-btn" class="flex-[2] group relative inline-flex items-center justify-center px-8 py-5 font-bold transition-all duration-200 rounded-2xl active:scale-95 overflow-hidden bg-white text-black hover:bg-gray-200 shadow-xl">
+                            启动防御协议
+                        </button>
+                        <button id="open-talents-btn" class="flex-1 px-8 py-5 font-bold transition-all duration-200 border border-gray-700 bg-gray-900 text-white hover:bg-gray-800 rounded-2xl active:scale-95">
+                            研发中心
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- HUD -->
+        <div id="hud" class="hidden">
+            <div class="hud-top bg-slate-900/50 backdrop-blur-sm">
+                <div id="upgrade-progress" class="progress-bar bg-sky-500 shadow-[0_0_10px_#0ea5e9]" style="width: 0%"></div>
+                <div class="absolute top-1 left-1/2 -translate-x-1/2 text-[8px] font-black uppercase tracking-widest text-slate-500 opacity-80">
+                    强化核心载入中
+                </div>
+            </div>
+            <div class="fixed top-6 left-6 flex gap-4">
+                <div class="p-4 bg-slate-950/80 rounded-2xl border border-white/5 backdrop-blur-md font-mono shadow-2xl">
+                    <div class="text-[9px] text-slate-500 uppercase font-black tracking-widest mb-1">碎片</div>
+                    <div id="hud-fragments" class="text-3xl text-amber-400 font-black">0</div>
+                </div>
+                <div class="p-4 bg-slate-950/80 rounded-2xl border border-white/5 backdrop-blur-md font-mono shadow-2xl">
+                    <div class="text-[9px] text-purple-500 uppercase font-black tracking-widest mb-1">核心</div>
+                    <div id="hud-cores" class="text-3xl text-purple-400 font-black">0</div>
+                </div>
+            </div>
+            <div class="fixed top-6 right-6 p-4 bg-slate-950/80 rounded-2xl border border-white/5 backdrop-blur-md font-mono shadow-2xl text-right">
+                <div class="text-[9px] text-slate-500 uppercase font-black tracking-widest mb-1">系统在线</div>
+                <div id="hud-time" class="text-3xl text-white font-black">00:00</div>
+            </div>
+            <div id="boss-warning" class="fixed inset-0 flex items-center justify-center pointer-events-none hidden">
+                <div class="bg-red-600/20 w-full h-40 flex flex-col items-center justify-center border-y border-red-500/50 backdrop-blur-sm animate-pulse">
+                    <div class="text-red-500 font-black text-6xl tracking-[0.5em] italic mb-2 drop-shadow-[0_0_15px_rgba(239,68,68,0.8)]">WARNING</div>
+                    <div class="text-white font-bold text-xl tracking-[0.2em] uppercase">巨大引力波靠近：陨石领主已现身</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card Selection Overlay -->
+        <div id="card-selection" class="screen bg-black/80 backdrop-blur-md hidden z-[150]">
+            <div class="flex flex-col items-center max-w-5xl w-full px-4">
+                <h2 id="card-title" class="text-3xl font-black mb-2 tracking-[0.2em] uppercase text-white">强化协议已就绪</h2>
+                <p class="text-slate-400 mb-12 text-sm uppercase tracking-widest font-bold">请选择一项增益效果</p>
+                <div id="card-container" class="grid grid-cols-1 md:grid-cols-3 gap-8 w-full">
+                    <!-- Cards injected here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Summary Overlay -->
+        <div id="summary-overlay" class="screen bg-black/90 backdrop-blur-xl hidden z-[200]">
+            <div id="summary-card" class="max-w-md w-full mx-4 p-8 border border-gray-800 bg-gray-900 rounded-3xl shadow-2xl">
+                <h2 id="summary-title" class="text-4xl font-extrabold mb-6 text-center tracking-tight text-white">防御终止</h2>
+                <div class="grid grid-cols-2 gap-4 mb-8">
+                    <div class="p-4 rounded-2xl border bg-gray-800/50 border-gray-700/50">
+                        <div class="text-[10px] uppercase tracking-wider text-gray-500 font-bold mb-1">本次收集</div>
+                        <div id="summary-frags" class="text-2xl font-mono font-bold text-amber-400">0</div>
+                    </div>
+                    <div class="p-4 rounded-2xl border bg-gray-800/50 border-gray-700/50">
+                        <div class="text-[10px] uppercase tracking-wider text-gray-500 font-bold mb-1">核心收集</div>
+                        <div id="summary-cores" class="text-2xl font-mono font-bold text-purple-400">0</div>
+                    </div>
+                </div>
+                <div class="p-6 rounded-2xl border bg-black/50 border-gray-800 mb-8 min-h-[120px] flex flex-col justify-center">
+                    <h3 class="text-xs uppercase tracking-widest text-gray-500 mb-2 font-bold">指挥官点评</h3>
+                    <p id="summary-lore" class="italic leading-relaxed text-lg text-gray-300">正在分析战斗数据...</p>
+                </div>
+                <div class="flex flex-col gap-3">
+                    <button id="summary-restart-btn" class="w-full py-4 px-6 font-bold rounded-2xl bg-white text-black hover:bg-gray-200 transition-all active:scale-95 shadow-xl">重新启动防御协议</button>
+                    <button id="summary-talents-btn" class="w-full py-4 px-6 font-bold rounded-2xl border border-gray-700 bg-gray-800 text-white hover:bg-gray-700 transition-all active:scale-95">进入研发中心</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Talent Tree -->
+        <div id="talent-tree" class="screen bg-[#020617] hidden z-[300]">
+            <div class="w-full h-20 bg-slate-950/60 backdrop-blur-xl border-b border-white/5 flex items-center justify-between px-10">
+                <button id="talent-back-btn" class="flex items-center gap-3 px-4 py-2 text-slate-400 hover:text-white transition-colors">
+                    <span class="text-xl">←</span>
+                    <span class="font-bold uppercase tracking-[0.2em] text-[11px]">退出研发</span>
+                </button>
+                <div class="flex items-center gap-6">
+                    <div class="flex items-center gap-3 border border-white/5 bg-black/40 rounded-2xl px-5 py-2">
+                        <div class="text-[9px] uppercase font-bold text-slate-500">可用能量碎片</div>
+                        <div class="flex items-center gap-2">
+                            <div class="w-3 h-3 rounded-full bg-amber-400 shadow-[0_0_8px_#fbbf24]"></div>
+                            <span id="talent-fragments" class="text-lg font-mono font-black text-amber-400">0</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div id="talent-content" class="relative flex-1 w-full flex items-center justify-center p-10 overflow-auto">
+                <!-- Talent nodes injected here -->
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { GoogleGenAI } from "@google/genai";
+
+        // --- Constants ---
+        const CIRCLE_RADIUS = 300;
+        const BULLET_FIRE_COOLDOWN = 1000;
+        const METEORITE_SPAWN_INTERVAL = 4500;
+        const BULLET_SPEED = 3.5;
+        const METEORITE_SPEED = 0.5;
+        const METEORITE_INITIAL_HP = 10;
+        const BULLET_DAMAGE = 5;
+        const TURRET_RADIUS = 24;
+        const FRAGMENT_RADIUS = 4;
+        const BULLET_RADIUS = 6;
+        const INITIAL_UPGRADE_THRESHOLD = 5;
+
+        // --- Talent Nodes Definition ---
+        const TALENT_NODES = [
+            { id: 'cooldown', name: '急速装填', description: '减少子弹射击冷却', maxLevel: 5, costPerLevel: 5, branch: 1 },
+            { id: 'bulletTrail', name: '能量轨迹', description: '增加子弹飞行速度', maxLevel: 3, costPerLevel: 25, prerequisiteId: 'cooldown', branch: 1 },
+            { id: 'damage', name: '强化弹药', description: '提升子弹杀伤力', maxLevel: 5, costPerLevel: 10, branch: 2 },
+            { id: 'spawnRate', name: '引力信标', description: '吸引更多陨石刷新', maxLevel: 5, costPerLevel: 5, branch: 3 },
+            { id: 'fragmentValue', name: '高效回收', description: '产生更多能量碎片', maxLevel: 3, costPerLevel: 30, prerequisiteId: 'spawnRate', branch: 3 },
+            { id: 'magnetRange', name: '磁场扩张', description: '增加光标回收碎品的范围', maxLevel: 3, costPerLevel: 25, prerequisiteId: 'spawnRate', branch: 3 },
+        ];
+
+        // --- Perks Definition ---
+        const PERKS = [
+            { id: 'extraBullets', name: '弹幕扩张', icon: '🏹', color: 'from-blue-500 to-cyan-400', description: '每次射击额外增加一发子弹' },
+            { id: 'reduceCooldown', name: '急速冷却', icon: '⏱️', color: 'from-indigo-500 to-purple-400', description: '射击冷却时间减少 20%' },
+            { id: 'increaseDamage', name: '高爆弹药', icon: '🧨', color: 'from-orange-500 to-red-400', description: '子弹基础伤害大幅提升' },
+            { id: 'homing', name: '追踪导引', icon: '🎯', color: 'from-teal-500 to-emerald-400', description: '子弹将自动追踪附近的陨石' },
+            { id: 'ice', name: '急冻核心', icon: '❄️', color: 'from-sky-300 to-blue-500', description: '子弹附带减速效果，冻结目标' },
+            { id: 'fire', name: '熔岩焚烧', icon: '🔥', color: 'from-red-500 to-orange-600', description: '子弹附带燃烧效果，持续造成伤害' },
+            { id: 'moreMeteorites', name: '陨石增幅', icon: '☄️', color: 'from-amber-600 to-yellow-400', description: '引力增强，提升陨石产出（危险！）' },
+        ];
+
+        // --- State ---
+        let state = {
+            screen: 'START',
+            skin: 'DEFAULT',
+            talents: {
+                levels: { cooldown: 0, damage: 0, spawnRate: 0, fragmentValue: 0, bulletTrail: 0, magnetRange: 0 },
+                totalFragments: 0,
+                totalCores: 0
+            },
+            game: {
+                active: false,
+                stats: { fragmentsCollected: 0, coresCollected: 0, meteoritesDestroyed: 0, totalDamageDealt: 0, bulletsFired: 0 },
+                progress: 0,
+                threshold: INITIAL_UPGRADE_THRESHOLD,
+                time: 0,
+                turretAngle: 0,
+                lastFireTime: 0,
+                bossSpawned: false,
+                firstBossDefeated: false
+            }
+        };
+
+        let bullets = [];
+        let meteorites = [];
+        let fragments = [];
+        let effects = [];
+        let mousePos = { x: 0, y: 0 };
+        let perksOwned = { bulletsPerShot: 1, cooldownMult: 1, damageBoost: 0, isHoming: false, isIce: false, isFire: false, spawnRateMult: 1, ownedOneTimers: [] };
+
+        // --- Services ---
+        const talentService = {
+            load() {
+                const saved = localStorage.getItem('stellar_sentinel_save_v1');
+                if (saved) {
+                    const parsed = JSON.parse(saved);
+                    state.talents.levels = { ...state.talents.levels, ...parsed.levels };
+                    state.talents.totalFragments = parsed.totalFragments || 0;
+                    state.talents.totalCores = parsed.totalCores || 0;
+                    state.skin = parsed.currentSkin || 'DEFAULT';
+                }
+            },
+            save() {
+                localStorage.setItem('stellar_sentinel_save_v1', JSON.stringify({
+                    levels: state.talents.levels,
+                    totalFragments: state.talents.totalFragments,
+                    totalCores: state.talents.totalCores,
+                    currentSkin: state.skin
+                }));
+            },
+            getBonuses() {
+                return {
+                    cooldownReduction: state.talents.levels.cooldown * 150,
+                    damageBoost: state.talents.levels.damage * 2,
+                    spawnBoost: state.talents.levels.spawnRate * 0.2,
+                    fragmentBonus: state.talents.levels.fragmentValue,
+                    bulletSpeedBoost: state.talents.levels.bulletTrail * 1.5,
+                    magnetRangeBoost: state.talents.levels.magnetRange * 20
+                };
+            }
+        };
+
+        const difficultyService = {
+            calculateSpawnInterval(survivalSecs, spawnBoost, perkMult) {
+                const timeFactor = 1 + (survivalSecs / 12) + Math.pow(survivalSecs / 60, 1.5);
+                const baseInterval = METEORITE_SPAWN_INTERVAL / (1 + spawnBoost);
+                return Math.max(350, baseInterval / (perkMult * timeFactor));
+            }
+        };
+
+        // --- Audio Manager ---
+        const audioManager = {
+            ctx: null, masterGain: null,
+            init() {
+                if (this.ctx) return;
+                this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+                this.masterGain = this.ctx.createGain();
+                this.masterGain.gain.value = 0.3;
+                this.masterGain.connect(this.ctx.destination);
+            },
+            playFire() {
+                if (!this.ctx) return;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sine'; osc.frequency.setValueAtTime(800, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(100, this.ctx.currentTime + 0.1);
+                gain.gain.setValueAtTime(0.05, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.1);
+                osc.connect(gain); gain.connect(this.masterGain);
+                osc.start(); osc.stop(this.ctx.currentTime + 0.1);
+            },
+            playHit() {
+                if (!this.ctx) return;
+                const noise = this.ctx.createBufferSource();
+                const bufferSize = this.ctx.sampleRate * 0.1;
+                const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+                const data = buffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+                noise.buffer = buffer;
+                const gain = this.ctx.createGain(); gain.gain.setValueAtTime(0.05, this.ctx.currentTime);
+                noise.connect(gain); gain.connect(this.masterGain);
+                noise.start();
+            },
+            playCollect() {
+                if (!this.ctx) return;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'triangle'; osc.frequency.setValueAtTime(1760, this.ctx.currentTime);
+                gain.gain.setValueAtTime(0.1, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.2);
+                osc.connect(gain); gain.connect(this.masterGain);
+                osc.start(); osc.stop(this.ctx.currentTime + 0.2);
+            }
+        };
+
+        // --- Gemini Service ---
+        async function getSummaryLore(stats) {
+            try {
+                const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+                const prompt = `你现在是“星际卫士”防卫军最高统帅。针对战报点评：碎片:${stats.fragmentsCollected}, 陨石:${stats.meteoritesDestroyed}, 弹药:${stats.bulletsFired}。语气硬核科幻军官，2句话内，直接输出内容。`;
+                const response = await ai.models.generateContent({
+                    model: 'gemini-3-flash-preview',
+                    contents: prompt,
+                });
+                return response.text?.trim() || "数据传输受损，但你的战绩将被星系铭记。";
+            } catch (e) {
+                console.error(e);
+                return "通讯离线。你的事迹已存入黑匣子。";
+            }
+        }
+
+        // --- Rendering Logic ---
+        const bgCanvas = document.getElementById('bg-canvas');
+        const gameCanvas = document.getElementById('game-canvas');
+        const bgCtx = bgCanvas.getContext('2d');
+        const gameCtx = gameCanvas.getContext('2d');
+
+        function resize() {
+            bgCanvas.width = gameCanvas.width = window.innerWidth;
+            bgCanvas.height = gameCanvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        // Background Atmosphere
+        const starLayers = [
+            { count: 150, speed: 0.05, size: 0.8, opacity: 0.3 },
+            { count: 100, speed: 0.12, size: 1.5, opacity: 0.6 },
+            { count: 30, speed: 0.25, size: 2.2, opacity: 0.9 },
+        ].map(layer => Array.from({ length: layer.count }, () => ({
+            x: Math.random() * window.innerWidth,
+            y: Math.random() * window.innerHeight,
+            size: Math.random() * layer.size,
+            speed: layer.speed,
+            color: '#fff'
+        })));
+
+        function drawBackground() {
+            bgCtx.fillStyle = state.skin === 'SPRING_FESTIVAL' ? '#1a0b0b' : (state.skin === 'LGBT' ? '#0a0510' : '#000');
+            bgCtx.fillRect(0, 0, bgCanvas.width, bgCanvas.height);
+            starLayers.forEach(layer => {
+                layer.forEach(s => {
+                    s.y += s.speed;
+                    if (s.y > bgCanvas.height) { s.y = 0; s.x = Math.random() * bgCanvas.width; }
+                    bgCtx.fillStyle = s.color;
+                    bgCtx.beginPath(); bgCtx.arc(s.x, s.y, s.size, 0, Math.PI * 2); bgCtx.fill();
+                });
+            });
+        }
+
+        // --- Game Engine Logic ---
+        function generateMeteoriteVertices(radius, isBoss) {
+            const sides = isBoss ? 14 : (radius >= 24 ? 10 : 7);
+            const vertices = [];
+            const noise = isBoss || radius >= 24 ? 0.15 : 0.08;
+            for (let i = 0; i < sides; i++) {
+                const angle = (i * Math.PI * 2) / sides;
+                const r = radius * (Math.random() * noise + (1 - noise / 2));
+                vertices.push({ x: Math.cos(angle) * r, y: Math.sin(angle) * r });
+            }
+            return vertices;
+        }
+
+        function createExplosion(x, y, color, scale = 1) {
+            for (let i = 0; i < 15 * scale; i++) {
+                effects.push({
+                    x, y, vx: (Math.random() - 0.5) * 10 * scale, vy: (Math.random() - 0.5) * 10 * scale,
+                    life: 1, decay: 0.02, size: Math.random() * 5 * scale, color, type: 'debris'
+                });
+            }
+        }
+
+        function spawnMeteorite() {
+            const bonuses = talentService.getBonuses();
+            const spawnDist = Math.sqrt(gameCanvas.width**2 + gameCanvas.height**2) / 2 + 150;
+            const angle = Math.random() * Math.PI * 2;
+            const cX = gameCanvas.width / 2, cY = gameCanvas.height / 2;
+            const x = cX + Math.cos(angle) * spawnDist;
+            const y = cY + Math.sin(angle) * spawnDist;
+            const dx = cX - x, dy = cY - y, dist = Math.sqrt(dx*dx + dy*dy);
+            const radius = 14 + Math.random() * 24;
+            meteorites.push({
+                x, y, hp: METEORITE_INITIAL_HP, maxHp: METEORITE_INITIAL_HP,
+                vx: (dx / dist) * METEORITE_SPEED, vy: (dy / dist) * METEORITE_SPEED,
+                radius, rotation: 0, rotationSpeed: (Math.random() - 0.5) * 0.04,
+                spawnTime: Date.now(), vertices: generateMeteoriteVertices(radius, false)
+            });
+        }
+
+        function spawnBoss() {
+            const spawnDist = Math.sqrt(gameCanvas.width**2 + gameCanvas.height**2) / 2 + 150;
+            const angle = Math.random() * Math.PI * 2;
+            const cX = gameCanvas.width / 2, cY = gameCanvas.height / 2;
+            const x = cX + Math.cos(angle) * spawnDist, y = cY + Math.sin(angle) * spawnDist;
+            const dx = cX - x, dy = cY - y, dist = Math.sqrt(dx*dx + dy*dy);
+            meteorites.push({
+                x, y, hp: 200, maxHp: 200,
+                vx: (dx / dist) * (METEORITE_SPEED * 0.4), vy: (dy / dist) * (METEORITE_SPEED * 0.4),
+                radius: 65, rotation: 0, rotationSpeed: 0.008,
+                spawnTime: Date.now(), isBoss: true, vertices: generateMeteoriteVertices(65, true)
+            });
+            state.game.bossSpawned = true;
+            document.getElementById('boss-warning').classList.remove('hidden');
+            setTimeout(() => document.getElementById('boss-warning').classList.add('hidden'), 4000);
+        }
+
+        function fireBullet() {
+            const cX = gameCanvas.width / 2, cY = gameCanvas.height / 2;
+            const bonuses = talentService.getBonuses();
+            const angle = state.game.turretAngle;
+            const bSpeed = BULLET_SPEED + bonuses.bulletSpeedBoost;
+            for (let i = 0; i < perksOwned.bulletsPerShot; i++) {
+                const offset = (i - (perksOwned.bulletsPerShot - 1) / 2) * 0.15;
+                bullets.push({
+                    x: cX, y: cY,
+                    vx: Math.cos(angle + offset) * bSpeed,
+                    vy: Math.sin(angle + offset) * bSpeed,
+                    radius: BULLET_RADIUS, distance: 0, maxDist: CIRCLE_RADIUS,
+                    trail: [], isHoming: perksOwned.isHoming, isIce: perksOwned.isIce, isFire: perksOwned.isFire
+                });
+                state.game.stats.bulletsFired++;
+            }
+            state.game.lastFireTime = Date.now();
+            audioManager.playFire();
+        }
+
+        function updateGame(delta) {
+            if (!state.game.active || state.screen !== 'PLAYING') return;
+
+            const cX = gameCanvas.width / 2, cY = gameCanvas.height / 2;
+            const bonuses = talentService.getBonuses();
+
+            // Turret Aiming
+            const targetAngle = Math.atan2(mousePos.y - cY, mousePos.x - cX);
+            let angleDiff = targetAngle - state.game.turretAngle;
+            while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+            while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+            state.game.turretAngle += angleDiff * 0.18;
+
+            // Spawning
+            const survivalSecs = state.game.time / 1000;
+            const interval = difficultyService.calculateSpawnInterval(survivalSecs, bonuses.spawnBoost, perksOwned.spawnRateMult);
+            if (Date.now() - lastSpawnTime > interval) {
+                spawnMeteorite();
+                lastSpawnTime = Date.now();
+            }
+            if (survivalSecs >= 30 && !state.game.bossSpawned) {
+                spawnBoss();
+            }
+
+            // Update Objects
+            bullets.forEach((b, idx) => {
+                b.trail.push({ x: b.x, y: b.y });
+                if (b.trail.length > 15) b.trail.shift();
+
+                if (b.isHoming) {
+                    let best = null, bestScore = Infinity;
+                    meteorites.forEach(m => {
+                        const dMouse = (m.x - mousePos.x)**2 + (m.y - mousePos.y)**2;
+                        const dBullet = (m.x - b.x)**2 + (m.y - b.y)**2;
+                        if (dBullet > 800**2) return;
+                        const score = dMouse + dBullet * 0.1;
+                        if (score < bestScore) { bestScore = score; best = m; }
+                    });
+                    if (best) {
+                        const targetAngle = Math.atan2(best.y - b.y, best.x - b.x);
+                        const curAngle = Math.atan2(b.vy, b.vx);
+                        let diff = targetAngle - curAngle;
+                        while (diff < -Math.PI) diff += Math.PI * 2;
+                        while (diff > Math.PI) diff -= Math.PI * 2;
+                        const newAngle = curAngle + diff * 0.18;
+                        const speed = Math.sqrt(b.vx**2 + b.vy**2);
+                        b.vx = Math.cos(newAngle) * speed; b.vy = Math.sin(newAngle) * speed;
+                    }
+                }
+
+                b.x += b.vx; b.y += b.vy; b.distance += Math.sqrt(b.vx**2 + b.vy**2);
+                
+                // Collision
+                let hit = false;
+                for (let i = meteorites.length - 1; i >= 0; i--) {
+                    const m = meteorites[i];
+                    if ((b.x - m.x)**2 + (b.y - m.y)**2 < (m.radius + b.radius)**2) {
+                        m.hp -= (BULLET_DAMAGE + bonuses.damageBoost + perksOwned.damageBoost);
+                        m.flash = 10;
+                        if (b.isIce) m.slow = 100;
+                        if (b.isFire) m.burn = 100;
+                        audioManager.playHit(); hit = true; break;
+                    }
+                }
+                if (hit || b.distance > b.maxDist) bullets.splice(idx, 1);
+            });
+
+            meteorites.forEach((m, idx) => {
+                let speed = 1;
+                if (m.slow > 0) { speed = 0.4; m.slow--; }
+                if (m.burn > 0) { m.hp -= 0.05; m.burn--; }
+                m.x += m.vx * speed; m.y += m.vy * speed; m.rotation += m.rotationSpeed * speed;
+                
+                if (m.hp <= 0) {
+                    state.game.stats.meteoritesDestroyed++;
+                    createExplosion(m.x, m.y, '#38bdf8', m.isBoss ? 4 : 1);
+                    const fragCount = m.isBoss ? 20 : (4 + bonuses.fragmentBonus);
+                    for (let i = 0; i < fragCount; i++) {
+                        fragments.push({
+                            x: m.x, y: m.y, vx: (Math.random()-0.5)*15, vy: (Math.random()-0.5)*15,
+                            radius: FRAGMENT_RADIUS, color: '#fbbf24', isCore: m.isBoss && i === 0
+                        });
+                    }
+                    if (m.isBoss) state.game.firstBossDefeated = true;
+                    meteorites.splice(idx, 1);
+                    return;
+                }
+
+                if ((m.x - cX)**2 + (m.y - cY)**2 < (TURRET_RADIUS + m.radius)**2) {
+                    gameOver();
+                }
+            });
+
+            fragments.forEach((f, idx) => {
+                if (!f.collected) {
+                    f.x += f.vx; f.y += f.vy; f.vx *= 0.9; f.vy *= 0.9;
+                    const range = 30 + bonuses.magnetRangeBoost;
+                    if ((f.x - mousePos.x)**2 + (f.y - mousePos.y)**2 < range**2) { f.collected = true; audioManager.playCollect(); }
+                } else {
+                    const dx = cX - f.x, dy = cY - f.y, d = Math.sqrt(dx*dx + dy*dy);
+                    f.x += (dx/d) * 15; f.y += (dy/d) * 15;
+                    if (d < TURRET_RADIUS + 5) {
+                        if (f.isCore) state.game.stats.coresCollected++;
+                        else {
+                            state.game.stats.fragmentsCollected++;
+                            state.game.progress++;
+                            if (state.game.progress >= state.game.threshold) {
+                                state.game.progress = 0;
+                                state.game.threshold = Math.floor(state.game.threshold * 1.4) + 3;
+                                openCardSelection();
+                            }
+                        }
+                        fragments.splice(idx, 1);
+                    }
+                }
+            });
+
+            effects.forEach((e, idx) => {
+                e.x += e.vx; e.y += e.vy; e.life -= e.decay;
+                if (e.life <= 0) effects.splice(idx, 1);
+            });
+
+            state.game.time += delta;
+            updateHud();
+        }
+
+        function drawGame() {
+            gameCtx.clearRect(0, 0, gameCanvas.width, gameCanvas.height);
+            const cX = gameCanvas.width / 2, cY = gameCanvas.height / 2;
+
+            // Base Circle
+            gameCtx.strokeStyle = 'rgba(56, 189, 248, 0.1)';
+            gameCtx.lineWidth = 2;
+            gameCtx.beginPath(); gameCtx.arc(cX, cY, CIRCLE_RADIUS, 0, Math.PI * 2); gameCtx.stroke();
+
+            // Turret Indicator
+            gameCtx.save();
+            gameCtx.translate(cX, cY);
+            gameCtx.rotate(state.game.turretAngle);
+            gameCtx.fillStyle = 'rgba(56, 189, 248, 0.4)';
+            gameCtx.beginPath(); gameCtx.moveTo(TURRET_RADIUS + 40, 0); gameCtx.lineTo(TURRET_RADIUS + 33, -3); gameCtx.lineTo(TURRET_RADIUS + 33, 3); gameCtx.fill();
+            gameCtx.restore();
+
+            // Draw Bullets
+            bullets.forEach(b => {
+                gameCtx.fillStyle = '#fff';
+                gameCtx.beginPath(); gameCtx.arc(b.x, b.y, b.radius, 0, Math.PI * 2); gameCtx.fill();
+            });
+
+            // Draw Meteorites
+            meteorites.forEach(m => {
+                gameCtx.save(); gameCtx.translate(m.x, m.y); gameCtx.rotate(m.rotation);
+                gameCtx.beginPath();
+                m.vertices.forEach((v, i) => { if (i === 0) gameCtx.moveTo(v.x, v.y); else gameCtx.lineTo(v.x, v.y); });
+                gameCtx.closePath();
+                gameCtx.fillStyle = m.flash > 0 ? '#fff' : '#1e293b';
+                if (m.flash > 0) m.flash--;
+                gameCtx.fill(); gameCtx.strokeStyle = 'rgba(255,255,255,0.2)'; gameCtx.stroke();
+                gameCtx.restore();
+            });
+
+            // Draw Fragments
+            fragments.forEach(f => {
+                gameCtx.fillStyle = f.isCore ? '#a855f7' : '#fbbf24';
+                gameCtx.beginPath(); gameCtx.arc(f.x, f.y, f.isCore ? 8 : f.radius, 0, Math.PI * 2); gameCtx.fill();
+            });
+
+            // Draw Effects
+            effects.forEach(e => {
+                gameCtx.globalAlpha = e.life;
+                gameCtx.fillStyle = e.color;
+                gameCtx.beginPath(); gameCtx.arc(e.x, e.y, e.size, 0, Math.PI * 2); gameCtx.fill();
+            });
+
+            // Draw Turret
+            gameCtx.save(); gameCtx.translate(cX, cY); gameCtx.rotate(state.game.turretAngle);
+            gameCtx.fillStyle = '#0f172a';
+            gameCtx.beginPath(); gameCtx.arc(0, 0, TURRET_RADIUS, 0, Math.PI * 2); gameCtx.fill();
+            gameCtx.fillStyle = '#38bdf8';
+            gameCtx.fillRect(0, -6, 40, 12);
+            gameCtx.restore();
+        }
+
+        // --- UI Controllers ---
+        function updateHud() {
+            document.getElementById('hud-fragments').textContent = state.game.stats.fragmentsCollected;
+            document.getElementById('hud-cores').textContent = state.game.stats.coresCollected;
+            const sec = Math.floor(state.game.time / 1000);
+            document.getElementById('hud-time').textContent = `${Math.floor(sec/60).toString().padStart(2,'0')}:${(sec%60).toString().padStart(2,'0')}`;
+            document.getElementById('upgrade-progress').style.width = `${(state.game.progress / state.game.threshold) * 100}%`;
+        }
+
+        function openCardSelection() {
+            state.game.active = false;
+            document.getElementById('card-selection').classList.remove('hidden');
+            const container = document.getElementById('card-container');
+            container.innerHTML = '';
+            const options = [...PERKS].sort(() => 0.5 - Math.random()).slice(0, 3);
+            options.forEach(perk => {
+                const card = document.createElement('div');
+                card.className = "p-8 border-2 border-slate-800 bg-slate-900/60 rounded-3xl hover:border-sky-400 cursor-pointer transition-all flex flex-col items-center group";
+                card.innerHTML = `
+                    <div class="w-20 h-20 rounded-2xl bg-gradient-to-br ${perk.color} flex items-center justify-center text-4xl mb-6 shadow-lg group-hover:scale-105 transition-transform">${perk.icon}</div>
+                    <h3 class="text-xl font-black mb-2 text-white uppercase">${perk.name}</h3>
+                    <p class="text-sm text-slate-400 text-center">${perk.description}</p>
+                `;
+                card.onclick = () => {
+                    if (perk.id === 'extraBullets') perksOwned.bulletsPerShot++;
+                    else if (perk.id === 'reduceCooldown') perksOwned.cooldownMult *= 0.8;
+                    else if (perk.id === 'increaseDamage') perksOwned.damageBoost += 5;
+                    else if (perk.id === 'homing') perksOwned.isHoming = true;
+                    else if (perk.id === 'ice') perksOwned.isIce = true;
+                    else if (perk.id === 'fire') perksOwned.isFire = true;
+                    else if (perk.id === 'moreMeteorites') perksOwned.spawnRateMult += 0.5;
+                    
+                    document.getElementById('card-selection').classList.add('hidden');
+                    state.game.active = true;
+                };
+                container.appendChild(card);
+            });
+        }
+
+        async function gameOver() {
+            state.game.active = false;
+            document.getElementById('hud').classList.add('hidden');
+            document.getElementById('summary-overlay').classList.remove('hidden');
+            document.getElementById('summary-frags').textContent = state.game.stats.fragmentsCollected;
+            document.getElementById('summary-cores').textContent = state.game.stats.coresCollected;
+            
+            talentService.addCurrency(state.game.stats.fragmentsCollected, state.game.stats.coresCollected);
+            const lore = await getSummaryLore(state.game.stats);
+            document.getElementById('summary-lore').textContent = lore;
+        }
+
+        function showTalents() {
+            document.getElementById('start-screen').classList.add('hidden');
+            document.getElementById('summary-overlay').classList.add('hidden');
+            document.getElementById('talent-tree').classList.remove('hidden');
+            renderTalentTree();
+        }
+
+        function renderTalentTree() {
+            const container = document.getElementById('talent-content');
+            container.innerHTML = '';
+            document.getElementById('talent-fragments').textContent = state.talents.totalFragments;
+            
+            TALENT_NODES.forEach(node => {
+                const level = state.talents.levels[node.id] || 0;
+                const cost = node.costPerLevel * (level + 1);
+                const isMax = level >= node.maxLevel;
+                const canAfford = state.talents.totalFragments >= cost;
+                
+                const card = document.createElement('div');
+                card.className = `w-48 p-4 border rounded-2xl m-4 text-center ${level > 0 ? 'border-sky-500' : 'border-slate-800'} bg-slate-900/40`;
+                card.innerHTML = `
+                    <div class="text-xs font-black uppercase text-slate-500 mb-2">${node.name}</div>
+                    <div class="text-[9px] text-slate-400 mb-4">${node.description}</div>
+                    <div class="text-sky-400 font-mono text-sm mb-4">${isMax ? 'MAX' : level + '/' + node.maxLevel}</div>
+                    ${!isMax ? `<button class="w-full py-2 text-[10px] font-bold rounded-lg ${canAfford ? 'bg-sky-500 text-black' : 'bg-slate-800 text-slate-500 cursor-not-allowed'}">${cost} 升级</button>` : ''}
+                `;
+                const btn = card.querySelector('button');
+                if (btn && canAfford) {
+                    btn.onclick = () => {
+                        state.talents.totalFragments -= cost;
+                        state.talents.levels[node.id]++;
+                        talentService.save();
+                        renderTalentTree();
+                    };
+                }
+                container.appendChild(card);
+            });
+        }
+
+        talentService.addCurrency = function(f, c) {
+            state.talents.totalFragments += f;
+            state.talents.totalCores += c;
+            this.save();
+        };
+
+        // --- Event Listeners ---
+        document.getElementById('start-game-btn').onclick = () => {
+            audioManager.init();
+            document.getElementById('start-screen').classList.add('hidden');
+            document.getElementById('hud').classList.remove('hidden');
+            resetGame();
+            state.game.active = true;
+            state.screen = 'PLAYING';
+        };
+
+        document.getElementById('open-talents-btn').onclick = showTalents;
+        document.getElementById('talent-back-btn').onclick = () => {
+            document.getElementById('talent-tree').classList.add('hidden');
+            document.getElementById('start-screen').classList.remove('hidden');
+        };
+
+        document.getElementById('summary-restart-btn').onclick = () => {
+            document.getElementById('summary-overlay').classList.add('hidden');
+            document.getElementById('hud').classList.remove('hidden');
+            resetGame();
+            state.game.active = true;
+            state.screen = 'PLAYING';
+        };
+
+        document.getElementById('summary-talents-btn').onclick = showTalents;
+
+        window.addEventListener('mousemove', e => { mousePos = { x: e.clientX, y: e.clientY }; });
+        window.addEventListener('mousedown', e => { if (e.button === 0 && state.game.active) fireBullet(); });
+
+        function resetGame() {
+            state.game.stats = { fragmentsCollected: 0, coresCollected: 0, meteoritesDestroyed: 0, totalDamageDealt: 0, bulletsFired: 0 };
+            state.game.time = 0; state.game.progress = 0; state.game.threshold = INITIAL_UPGRADE_THRESHOLD;
+            state.game.bossSpawned = false;
+            bullets = []; meteorites = []; fragments = []; effects = [];
+            perksOwned = { bulletsPerShot: 1, cooldownMult: 1, damageBoost: 0, isHoming: false, isIce: false, isFire: false, spawnRateMult: 1, ownedOneTimers: [] };
+            lastSpawnTime = Date.now();
+        }
+
+        let lastTime = 0, lastSpawnTime = 0;
+        function loop(ts) {
+            const delta = ts - lastTime;
+            lastTime = ts;
+            drawBackground();
+            updateGame(delta);
+            drawGame();
+            requestAnimationFrame(loop);
+        }
+
+        talentService.load();
+        requestAnimationFrame(loop);
+
+    </script>
 </body>
 </html>
