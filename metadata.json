@@ -1,5 +1,5 @@
 {
-  "name": "星际卫士：核心保卫战",
-  "description": "原生 JavaScript 重写的星际防御游戏，支持双模式、天赋树、随机强化和 Gemini 战况分析。",
+  "name": "星际卫士：炮塔防御",
+  "description": "一款战略生存游戏，你将控制中央炮塔，抵御来袭的陨石并收集碎片。由 Gemini 提供赛后表现分析。",
   "requestFramePermissions": []
 }
