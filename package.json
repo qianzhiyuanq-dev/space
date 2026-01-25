@@ -1,0 +1,29 @@
+
+{
+  "name": "stellar-sentinel",
+  "version": "1.0.0",
+  "description": "星际卫士：炮塔防御游戏",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder"
+  },
+  "author": "Stellar Sentinel Team",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^31.0.0",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.stellar.sentinel",
+    "productName": "星际卫士",
+    "win": {
+      "target": "portable",
+      "icon": "icon.ico"
+    },
+    "directories": {
+      "output": "dist"
+    }
+  }
+}
