@@ -17,8 +17,8 @@ jobs:
       - name: Install & Fix Security & Build
         run: |
           npm install
-          # 自动修复 http 链接为 https
-          grep -rl "http://qzy-ai.site" . --exclude-dir=node_modules | xargs sed -i 's/http:\/\/qzy-ai.site/https:\/\/qzy-ai.site/g' || true
+          # 这一行会自动将代码中所有的 http 改为 https，修复你图片里的 Mixed Content 报错
+          find . -type f -name "*.tsx" -o -name "*.ts" -o -name "*.js" | xargs sed -i 's/http:\/\/qzy-ai.site/https:\/\/qzy-ai.site/g'
           npm run build
       - uses: actions/upload-pages-artifact@v3
         with:
