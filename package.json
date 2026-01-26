@@ -9,7 +9,10 @@
     "react-dom": "^18.2.0",
     "@google/genai": "latest"
   },
+  "devDependencies": {
+    "esbuild": "^0.20.0"
+  },
   "scripts": {
-    "build": "echo 'Build successful'"
+    "build": "mkdir -p public && esbuild index.tsx --bundle --outfile=public/index.js --format=esm --external:react --external:react-dom --external:@google/genai --define:process.env.API_KEY=\"'$API_KEY'\" && cp index.html public/index.html && cp metadata.json public/metadata.json"
   }
 }
