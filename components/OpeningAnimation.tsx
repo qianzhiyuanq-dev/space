@@ -76,10 +76,10 @@ const OpeningAnimation: React.FC<OpeningAnimationProps> = ({ onComplete, skin })
       ctx.fillStyle = isSpring ? '#1a0b0b' : (isLgbt ? '#0a0510' : '#000');
       ctx.fillRect(0, 0, width, height);
       
-      // 动态速度曲线
-      if (currentProgress < 0.2) speed = 1.5;
-      else if (currentProgress < 0.8) speed = 1.5 + (currentProgress - 0.2) * 60; // 跃迁加速
-      else speed = 40 - (currentProgress - 0.8) * 150; // 冲出后的减速
+      // 动态速度曲线 - 加快了整体位移
+      if (currentProgress < 0.2) speed = 2.5;
+      else if (currentProgress < 0.8) speed = 2.5 + (currentProgress - 0.2) * 80; 
+      else speed = 50 - (currentProgress - 0.8) * 200; 
 
       ctx.save();
       ctx.translate(width / 2, height / 2);
@@ -95,7 +95,7 @@ const OpeningAnimation: React.FC<OpeningAnimationProps> = ({ onComplete, skin })
 
         const sx = s.x * (width / s.z);
         const sy = s.y * (width / s.z);
-        const size = (1 - s.z / width) * 3;
+        const size = (1 - s.z / width) * 3.5;
 
         if (s.px !== 0) {
           ctx.beginPath();
@@ -119,7 +119,7 @@ const OpeningAnimation: React.FC<OpeningAnimationProps> = ({ onComplete, skin })
 
       // 屏幕震动
       if (currentProgress > 0.4 && currentProgress < 0.85) {
-        const shake = (currentProgress - 0.4) * 10;
+        const shake = (currentProgress - 0.4) * 15;
         canvas.style.transform = `translate(${(Math.random() - 0.5) * shake}px, ${(Math.random() - 0.5) * shake}px)`;
       } else {
         canvas.style.transform = 'none';
@@ -128,18 +128,19 @@ const OpeningAnimation: React.FC<OpeningAnimationProps> = ({ onComplete, skin })
       animationFrame = requestAnimationFrame(animate);
     };
 
+    // 加快进度步进速度：从 0.01/30ms 提升到 0.03/20ms
     const progressTimer = setInterval(() => {
-      currentProgress += 0.01;
-      setProgress(currentProgress);
+      currentProgress += 0.03;
+      setProgress(Math.min(currentProgress, 1));
       
       const stageIdx = Math.floor(currentProgress * theme.messages.length);
       setStage(Math.min(stageIdx, theme.messages.length - 1));
 
       if (currentProgress >= 1) {
         clearInterval(progressTimer);
-        setTimeout(onComplete, 500);
+        setTimeout(onComplete, 200);
       }
-    }, 30);
+    }, 20);
 
     animate();
 
@@ -160,30 +161,21 @@ const OpeningAnimation: React.FC<OpeningAnimationProps> = ({ onComplete, skin })
     <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-hidden font-mono">
       <canvas ref={canvasRef} className="absolute inset-0" />
       
-      {/* 渐变遮罩增强空间感 */}
-      <div className={`absolute inset-0 pointer-events-none transition-opacity duration-1000 ${progress > 0.5 ? 'opacity-40' : 'opacity-20'} ${
+      <div className={`absolute inset-0 pointer-events-none transition-opacity duration-500 ${progress > 0.5 ? 'opacity-40' : 'opacity-20'} ${
         isSpring ? 'bg-gradient-to-t from-red-900/50 to-transparent' : 
         isLgbt ? 'bg-gradient-to-t from-purple-900/50 to-transparent' : 
         'bg-gradient-to-t from-sky-900/50 to-transparent'
       }`} />
 
       {/* HUD 系统文字 */}
-      <div className="relative z-10 flex flex-col items-center gap-8 w-full max-w-lg">
+      <div className="relative z-10 flex flex-col items-center gap-4 w-full max-w-lg">
         <div className="flex flex-col items-center">
             <div className={`text-[10px] uppercase tracking-[0.5em] mb-4 opacity-50 ${theme.primary}`}>
                 Hyper-Space Sequence
             </div>
-            <div className={`text-2xl font-black italic tracking-wider transition-all duration-300 ${theme.primary} drop-shadow-lg`}>
+            <div className={`text-3xl font-black italic tracking-wider transition-all duration-150 ${theme.primary} drop-shadow-lg`}>
                 {theme.messages[stage]}
             </div>
-        </div>
-
-        {/* 极简进度条 */}
-        <div className="w-64 h-1 bg-white/10 rounded-full overflow-hidden backdrop-blur-sm border border-white/5">
-            <div 
-                className={`h-full transition-all duration-100 ease-linear ${theme.accent}`}
-                style={{ width: `${progress * 100}%` }}
-            />
         </div>
 
         {/* 侧边装饰 HUD */}
@@ -202,7 +194,7 @@ const OpeningAnimation: React.FC<OpeningAnimationProps> = ({ onComplete, skin })
       {/* 跃迁白光爆发特效 */}
       {progress > 0.9 && (
         <div 
-          className="absolute inset-0 bg-white z-[110] transition-opacity duration-500" 
+          className="absolute inset-0 bg-white z-[110] transition-opacity duration-300" 
           style={{ opacity: (progress - 0.9) * 10 }}
         />
       )}
