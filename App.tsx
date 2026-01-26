@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
+import { Analytics } from '@vercel/analytics/react';
 import GameEngine from './components/GameEngine';
 import SummaryOverlay from './components/SummaryOverlay';
 import TalentTree from './components/TalentTree';
@@ -171,6 +172,7 @@ const App: React.FC = () => {
       {gameState === 'PLAYING' && <GameEngine onGameOver={handleGameOver} skin={skin} />}
       {gameState === 'GAMEOVER' && lastStats && <SummaryOverlay stats={lastStats} onRestart={handleStartSequence} onOpenTalents={() => setGameState('TALENTS')} skin={skin} />}
       {gameState === 'TALENTS' && <TalentTree onBack={() => setGameState('START')} skin={skin} />}
+      <Analytics />
     </div>
   );
 };
